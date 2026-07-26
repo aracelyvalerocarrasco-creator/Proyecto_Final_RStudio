@@ -819,15 +819,6 @@ ggsave(
 # DISTRIBUCIÓN DEL ESTADO SEGÚN INSTITUCIÓN
 ###############################################################
 
-institucion_estado <- df %>%
-  count(INSTITUCION, ESTADO) %>%
-  group_by(INSTITUCION) %>%
-  mutate(Total = sum(n)) %>%
-  ungroup() %>%
-  group_by(INSTITUCION) %>%
-  filter(Total == max(Total)) %>%
-  ungroup()
-
 top_inst <- df %>%
   count(INSTITUCION, sort = TRUE) %>%
   slice_head(n = 8) %>%
@@ -835,12 +826,15 @@ top_inst <- df %>%
 
 institucion_estado <- df %>%
   filter(INSTITUCION %in% top_inst) %>%
-  count(INSTITUCION, ESTADO)
+  count(INSTITUCION, ESTADO) %>%
+  group_by(INSTITUCION) %>%
+  mutate(Total = sum(n)) %>%
+  ungroup()
 
 ggplot(
   institucion_estado,
   aes(
-    y = reorder(INSTITUCION, n),
+    y = reorder(INSTITUCION, Total),
     x = n,
     fill = ESTADO
   )
@@ -848,58 +842,115 @@ ggplot(
   geom_col(position = "fill", width = 0.8) +
   scale_x_continuous(labels = scales::percent) +
   scale_fill_brewer(palette = "Set2") +
+  guides(fill = guide_legend(nrow = 4, ncol = 2, byrow = TRUE)) +
   labs(
     title = "Estado de los establecimientos según institución",
     subtitle = "Ocho instituciones con mayor número de registros",
     x = "Porcentaje",
-    y = NULL,
+    y = "Institución administradora",
     fill = "Estado"
   ) +
   theme_minimal(base_size = 14) +
   theme(
     plot.title = element_text(face = "bold", size = 18),
-    plot.subtitle = element_text(size = 12),
+    plot.subtitle = element_text(size = 12, color = "gray30"),
     legend.position = "bottom",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.title.position = "top",
+    legend.text = element_text(size = 9),
+    legend.key.size = unit(0.4, "cm"),
+    legend.margin = margin(t = 10),
     panel.grid.major.y = element_blank(),
-    axis.text.y = element_text(face = "bold")
+    axis.text.y = element_text(face = "bold"),
+    axis.title.y = element_text(size = 12, margin = margin(r = 10))
   )
 
 ggsave(
   "figures/institucion_estado.png",
-  width = 10,
-  height = 6,
+  width = 12,
+  height = 7,
+  dpi = 300
+)
+
+#########################################################
+#########################################################
+# Gráfico de residuos estandarizados (Chi-cuadrado)
+# Muestra dónde se concentra la asociación institución-estado
+
+# Tabla de contingencia con las 8 instituciones principales
+tabla_contingencia <- df %>%
+  filter(INSTITUCION %in% top_inst) %>%
+  count(INSTITUCION, ESTADO) %>%
+  pivot_wider(names_from = ESTADO, values_from = n, values_fill = 0) %>%
+  column_to_rownames("INSTITUCION")
+
+# Prueba chi-cuadrado
+test_chi <- chisq.test(tabla_contingencia)
+
+# Extraer residuos estandarizados
+residuos <- as.data.frame(test_chi$stdres) %>%
+  rownames_to_column("INSTITUCION") %>%
+  pivot_longer(-INSTITUCION, names_to = "ESTADO", values_to = "residuo")
+
+# Gráfico
+ggplot(residuos, aes(x = ESTADO, y = reorder(INSTITUCION, residuo, sum), fill = residuo)) +
+  geom_tile(color = "white", linewidth = 0.8) +
+  geom_text(aes(label = round(residuo, 1)), size = 3.5, fontface = "bold") +
+  scale_fill_gradient2(
+    low = "#2166AC", mid = "white", high = "#B2182B",
+    midpoint = 0, name = "Residuo\nestandarizado"
+  ) +
+  labs(
+    title = "¿Dónde se concentra la asociación entre institución y estado?",
+    subtitle = "Residuos estandarizados de la prueba Chi-cuadrado (valores > |2| indican desviación significativa)",
+    x = "Estado del establecimiento",
+    y = "Institución administradora",
+    caption = "Fuente: RENIPRESS (SUSALUD) - Elaboración propia"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 11, color = "gray30"),
+    axis.text.x = element_text(angle = 45, hjust = 1, face = "bold"),
+    axis.text.y = element_text(face = "bold"),
+    panel.grid = element_blank(),
+    legend.position = "right"
+  )
+
+ggsave(
+  "figures/residuos_chi_cuadrado.png",
+  width = 12,
+  height = 7,
   dpi = 300
 )
 
 
 ###############################################################
-# COLLAGE DE LOS DOS GRÁFICOS PRINCIPALES
+# COLLAGE DE LOS GRÁFICOS DE ASOCIACIÓN (PARTE 2)
 ###############################################################
-
 library(magick)
 
 # Leer imágenes
-g1 <- image_read("figures/categorias_top10_departamentos.png")
-g2 <- image_read("figures/institucion_estado.png")
+g_estado <- image_read("figures/institucion_estado.png")
+g_residuos <- image_read("figures/residuos_chi_cuadrado.png")
 
-# Igualar el ancho
-ancho <- max(image_info(g1)$width, image_info(g2)$width)
+# Igualar la altura (para que se vean parejos lado a lado)
+alto <- min(image_info(g_estado)$height, image_info(g_residuos)$height)
+g_estado <- image_resize(g_estado, paste0("x", alto))
+g_residuos <- image_resize(g_residuos, paste0("x", alto))
 
-g1 <- image_resize(g1, paste0(ancho))
-g2 <- image_resize(g2, paste0(ancho))
-
-# Unir verticalmente
-collage <- image_append(
-  c(g1, g2),
-  stack = TRUE
+# Unir horizontalmente (lado a lado)
+collage_asociacion <- image_append(
+  c(g_estado, g_residuos),
+  stack = FALSE
 )
 
 # Guardar
 image_write(
-  collage,
-  path = "figures/collage_graficos.png",
+  collage_asociacion,
+  path = "collage/collage_asociacion.png",
   format = "png"
 )
 
 # Mostrar el collage
-collage
+collage_asociacion
