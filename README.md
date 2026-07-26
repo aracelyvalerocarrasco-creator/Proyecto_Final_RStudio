@@ -91,16 +91,11 @@ Esto sugiere que las políticas de supervisión o mejora del estado operativo de
 ---
 
 ## Difusión
-Los hallazgos finales fueron publicados en [LinkedIn/Twitter(X)]: [agrega aquí el link a tu publicación]
+Los hallazgos finales fueron publicados en [LinkedIn/Twitter(X)]: https://www.linkedin.com/posts/aracely-valero-carrasco-0667911b7_dataanalysis-rstats-anaerlisisdedatos-share-7486988587172003840-qr6-/?utm_source=share&utm_medium=member_desktop&rcm=ACoAADJ7pA4BOw3jXkEnxv7WWekNfuC0hS3T-yM
 
-![Captura de publicación](figures/captura_publicacion.png)
 
----
-## Repositorio
-🔗 [Link a este repositorio en GitHub](AGREGA-AQUI-TU-LINK)
 
 ---
-
 
 ## Estructura del proyecto
 
